@@ -1,0 +1,60 @@
+// LoggerProto EI Agent by Neil Hancock Aug 8, 2013 
+//http://forums.electricimp.com/discussion/1134/sharing-data-between-imps-using-xively-and-agents or 
+//https://gist.github.com/marcboon/5634981
+
+// ThingSpeak account credentials
+const TsApiWriteKey = "zzzz"
+const TsChannelId = "nnnnn"
+
+// Class for reading/writing a feed at thingspeak.com 
+class TsFeed {
+  static url = "http://api.thingspeak.com/update"
+  wrApiKey = null
+  feedID = null
+
+  constructor(wrApiKey, feedID) {
+    this.wrApiKey = wrApiKey
+    this.feedID = feedID
+  }
+
+  // Send data to feed, expects a table with channel:value pairs
+    //Min is http://api.thingspeak.com/update?key=3M1BQ5QP91DQWUPT%20&field1=62&field2=3&field3=5&field4=72&field5=65&%20status=REC005
+  function post(data, callback) {//TsFeed
+  // Example https://github.com/iobridge/ThingSpeak-Arduino-Examples/blob/master/Ethernet/Arduino_to_ThingSpeak.ino
+
+    local datastreamTs = [] //{ "?key=" + wrApiKey }
+    //datastreamTs += "?key=" + wrApiKey    
+    local logTs =[]
+    foreach(channel, value in data) {
+      logTs+=" "+channel + "=" + value 
+      datastreamTs +=  "&"+channel + "=" + value 
+    }
+    server.log("TsPush:"+logTs);//server.log("TsPush: "+channel+"="+value)
+      
+    //local body = { "version": "1.0.0", "datastreams": datastreamTs }
+    //local headers = { "X-ApiKey": apiKey, "Content-type": "application/json" }    
+    local postHeaders = { //"POST /update HTTP/1.1",
+        "Host": "api.thingspeak.com",  
+        "Connection": "close", 
+        "X-THINGSPEAKAPIKEY": wrApiKey,
+        "Content-type": "application/x-www-form-urlencoded" }
+    //server.log(format("%s",datastreamTs))
+    http.post(url , postHeaders, datastreamTs).sendasync(callback)
+    //http.put(url + feedID + ".json", headers, http.jsonencode(body)).sendasync(callback)
+  }
+}//end TsFeed
+
+// Post-update handler
+function onUpdateTs(res) {
+    if (200 != res.statuscode) server.log("AgtResultTsFail: " + res.statuscode )
+}
+
+// Handler for updates from device
+device.on("putPsTs", function(data) {
+  //server.log("AgtPutTs: " + http.jsonencode(data))
+  feedTs.post(data, onUpdateTs)
+})
+
+// Create feed object
+feedTs <- TsFeed(TsApiWriteKey, TsChannelId)
+//EOF
